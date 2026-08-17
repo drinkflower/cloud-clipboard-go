@@ -34,6 +34,12 @@ export function forbiddenOriginResponse() {
 }
 
 export function applyCorsHeaders(response, request, env) {
+  // Cloudflare 的 WebSocket 101 响应头不可再修改；浏览器 WebSocket
+  // 不使用 CORS 响应头，来源已在 fetch 入口处校验。
+  if (request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
+    return response;
+  }
+
   if (isAllowedOrigin(request, env)) {
     response.headers.set('Access-Control-Allow-Origin', allowedOrigin(env));
     Object.entries(corsHeadersBase).forEach(([name, value]) => response.headers.set(name, value));
