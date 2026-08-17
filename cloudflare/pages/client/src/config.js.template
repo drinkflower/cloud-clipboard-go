@@ -1,8 +1,7 @@
-// 环境检测
-const isCloudflarePages = window.location.hostname.includes('pages.dev') || 
-                         window.location.hostname.includes('your-custom-domain.com');
-
 const isDevelopment = process.env.NODE_ENV === 'development';
+// Production builds are served by Pages through either its pages.dev host or
+// a custom domain. Both must use the Worker API rather than same-origin paths.
+const isCloudflarePages = !isDevelopment;
 
 export const config = {
     // API 基础路径 (将被自动更新)
