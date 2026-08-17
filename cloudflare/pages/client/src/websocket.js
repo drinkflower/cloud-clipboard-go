@@ -376,17 +376,12 @@ export default {
             this.authCodeError = '';
 
             try {
-                // 1. 验证密码是否正确
-                const verified = await this.verifyRoomAccess(targetRoom, password);
-                if (!verified) {
-                    this.authCodeError = this.$t('authInvalid');
-                    return;
-                }
-
-                // 2. 用验证过的密码获取 room session token
+                // 密码只提交给令牌端点；受保护接口只接受服务端签发的短期令牌。
                 const session = await this.obtainRoomSessionToken(targetRoom, password);
                 if (!session || !session.token) {
-                    this.authCodeError = this.$t('connectionFailedRetry');
+                    this.authCodeError = session && session.invalid
+                        ? this.$t('authInvalid')
+                        : this.$t('connectionFailedRetry');
                     return;
                 }
 
@@ -433,6 +428,9 @@ export default {
                     scope: data.scope === 'global' ? 'global' : '',
                 };
             } catch (error) {
+                if (error && error.response && error.response.status === 401) {
+                    return { invalid: true };
+                }
                 console.error('Failed to obtain session token:', error);
                 return null;
             }
