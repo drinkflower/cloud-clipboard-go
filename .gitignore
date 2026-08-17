@@ -12,6 +12,9 @@
 /android/.gradle/
 .vscode/
 cloudflare/workers/.wrangler
+.wrangler/
+cloudflare/.wrangler/
+cloudflare/d1/.wrangler/
 cloudflare/workers/node_modules
 cloudflare/pages/server*
 cloudflare/node_modules

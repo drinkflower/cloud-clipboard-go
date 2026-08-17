@@ -12,8 +12,8 @@ fi
 echo "=== 部署 Cloud Clipboard 到 Cloudflare ==="
 echo ""
 echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-echo "!!! 部署前请先检查并修改 workers/wrangler.toml.template !!!"
-echo "!!! 特别是 AUTH_PASSWORD、ROOM_AUTH、ROOM_LIST 等变量     !!!"
+echo "!!! 部署前请确认 Worker Secrets 已设置：               !!!"
+echo "!!! APP_AUTH_PASSWORD、APP_ROOM_AUTH、ROOM_SESSION_SECRET !!!"
 echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 echo ""
 
@@ -24,6 +24,9 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
+
+# 生产前端只连接自定义 Worker 域名；不要改回 workers.dev。
+API_BASE_URL="${API_BASE_URL:-https://clipboard-api.666050.xyz/api}"
 
 info() {
     echo -e "${GREEN}[INFO]${NC} $1"
@@ -78,7 +81,7 @@ check_requirements() {
     fi
     
     info "检查 Wrangler 登录状态..."
-    if printf '%s' "$(wrangler whoami)" | grep -Eqi 'not|unauthenticated|please run `wrangler login`|not authenticated|not logged in'; then
+    if ! wrangler whoami > /dev/null; then
         warn "请先登录 Wrangler: wrangler login"
         exit 1
     fi
@@ -161,17 +164,9 @@ deploy_worker() {
     info "部署 Worker..."
     DEPLOY_OUTPUT=$(wrangler deploy --env="" 2>&1)
     
-    # 提取 Worker URL
-    if echo "$DEPLOY_OUTPUT" | grep -q "workers.dev"; then
-        WORKER_URL=$(echo "$DEPLOY_OUTPUT" | grep -o 'https://[^[:space:]]*\.workers\.dev' | head -1)
-        # 移除可能的尾部斜杠
-        WORKER_URL=${WORKER_URL%/}
-        info "Worker 部署成功: $WORKER_URL"
-    else
-        error "无法获取 Worker URL，请检查部署输出"
-        echo "$DEPLOY_OUTPUT"
-        exit 1
-    fi
+    # Worker 通过 wrangler.toml 中的自定义域名发布，禁止暴露 workers.dev。
+    WORKER_URL="$API_BASE_URL"
+    info "Worker 部署成功: $WORKER_URL"
     
     cd ..
     
@@ -193,8 +188,8 @@ update_frontend_config() {
     # 创建配置文件
     cp config.js.template config.js
     
-    # 更新配置文件中的 Worker URL
-    sed "${SED_INPLACE[@]}" "s|https://your-worker.your-subdomain.workers.dev|$WORKER_URL|g" config.js
+    # 更新配置文件中的 Worker API 基础地址
+    sed "${SED_INPLACE[@]}" "s|https://your-api.your-domain.example/api|$WORKER_URL|g" config.js
     
     info "前端配置已更新，Worker URL: $WORKER_URL"
     
@@ -260,15 +255,14 @@ show_results() {
     echo "📝 后续步骤:"
     echo "  1. 访问前端地址测试功能"
     echo "  2. 如需自定义域名，请在 Cloudflare Dashboard 中配置"
-    echo "  3. 可在 Worker 设置中配置环境变量（如认证密码）"
+    echo "  3. 可在 Worker 设置中轮换 Secrets（认证密码和会话密钥）"
     echo ""
-    echo "🔧 环境变量配置:"
-    echo "  - 脚本执行的默认环境变量在 cloudflare/workers/wrangler.toml.template 中定义。可在此文件内更改后,重新执行脚本."
-    echo "  - 也可部署完成后,去 workers 后台设置-变量-处更改"
+    echo "🔧 安全配置:"
+    echo "  - 非敏感变量在 cloudflare/workers/wrangler.toml.template 中定义。"
+    echo "  - APP_AUTH_PASSWORD、APP_ROOM_AUTH、ROOM_SESSION_SECRET 必须在 Worker Secrets 中设置。"
     echo ""
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-    echo "!!! 如果你在部署前没有修改 wrangler.toml.template        !!!"
-    echo "!!! 部署完成后务必去 Cloudflare Workers 后台检查并修改变量 !!!"
+    echo "!!! 不要把密码或会话密钥写回 wrangler.toml.template       !!!"
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
     echo "  - 已支持 /api/content/latest、/api/content/:id 及对应 .json 路由"
     echo "  - 当前与 Go 版仍有少量行为差异，例如部分文件内容请求会重定向到 /api/file"

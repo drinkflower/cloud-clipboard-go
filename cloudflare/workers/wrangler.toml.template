@@ -2,16 +2,22 @@ name = "cloud-clipboard-worker"
 main = "src/index.js"
 compatibility_date = "2024-01-15"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = false
 
-# 环境变量
+# Worker 仅通过此自定义 API 域名提供服务。
+routes = [
+  { pattern = "clipboard-api.666050.xyz", custom_domain = true }
+]
+
+# 非敏感运行配置。密码和会话签名密钥必须使用 Cloudflare Worker Secrets：
+# APP_AUTH_PASSWORD、APP_ROOM_AUTH、ROOM_SESSION_SECRET。
 [vars]
-AUTH_PASSWORD = "123"
-ROOM_AUTH = "{\"private\":\"\",\"finance\":\"finance-pass\"}"
+ALLOWED_ORIGIN = "https://clip.666050.xyz"
 ROOM_LIST = "true"
-HISTORY_LIMIT = "50"
+HISTORY_LIMIT = "100"
 TEXT_LIMIT = "40960"
-FILE_LIMIT = "204857600"
-FILE_EXPIRE = "3600"
+FILE_LIMIT = "104857600"
+FILE_EXPIRE = "36000000"
 
 # D1 数据库绑定 (将被自动更新)
 [[d1_databases]]

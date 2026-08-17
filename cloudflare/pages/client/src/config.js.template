@@ -1,16 +1,15 @@
 const isDevelopment = process.env.NODE_ENV === 'development';
-// Production builds are served by Pages through either its pages.dev host or
-// a custom domain. Both must use the Worker API rather than same-origin paths.
+// Production builds use the configured Worker API rather than same-origin paths.
+// The Worker accepts browser requests only from the configured custom domain.
 const isCloudflarePages = !isDevelopment;
+const workerApiBaseURL = 'https://your-api.your-domain.example/api';
 
 export const config = {
     // API 基础路径 (将被自动更新)
-    apiBaseURL: isDevelopment ? '' : 
-                isCloudflarePages ? 'https://your-worker.your-subdomain.workers.dev/api' : '',
+    apiBaseURL: isDevelopment ? '' : workerApiBaseURL,
     
     // WebSocket 基础路径 (将被自动更新)
-    wsBaseURL: isDevelopment ? '' : 
-               isCloudflarePages ? 'https://your-worker.your-subdomain.workers.dev/api' : '',
+    wsBaseURL: isDevelopment ? '' : workerApiBaseURL,
     
     // 环境标识
     isCloudflarePages: isCloudflarePages,

@@ -60,59 +60,53 @@ bash deploy.sh
 
 Cloudflare Workers 默认变量定义在 [cloudflare/workers/wrangler.toml.template](cloudflare/workers/wrangler.toml.template)。
 
-当前 [cloudflare/workers/wrangler.toml.template](cloudflare/workers/wrangler.toml.template) 里的 `vars` 目前包括这些变量：
+当前模板只保留可公开的运行配置：
 
 例如：
 
 ```toml
 [vars]
-AUTH_PASSWORD = "123"
-ROOM_AUTH = "{\"private\":\"\",\"finance\":\"finance-pass\"}"
-ROOM_LIST = "false"
-HISTORY_LIMIT = "50"
-TEXT_LIMIT = "40960"
-FILE_LIMIT = "204857600"
-FILE_EXPIRE = "3600"
+ALLOWED_ORIGIN = "https://clip.666050.xyz"
+ROOM_LIST = "true"
 ```
 
 | 变量 | 默认值 | 类型 | 说明 |
 | --- | --- | --- | --- |
-| `AUTH_PASSWORD` | `"123"` | 字符串或布尔语义 | 全局入口密码。只要设置了就对所有房间生效，保证旧密码升级后仍可用 |
-| `ROOM_AUTH` | `{"private":"","finance":"finance-pass"}` | JSON 字符串 | 房间级密码映射。不会让 `AUTH_PASSWORD` 失效，而是为指定房间增加额外可用密码 |
-| `ROOM_LIST` | `"false"` | 布尔语义字符串 | 是否启用房间列表功能，支持 `1`、`true`、`yes`、`on` |
-| `HISTORY_LIMIT` | `"50"` | 整数字符串 | 每个房间保留的历史消息条数 |
+| `ALLOWED_ORIGIN` | `https://clip.666050.xyz` | URL | 唯一允许调用 API 和 WebSocket 的浏览器来源 |
+| `ROOM_LIST` | `"true"` | 布尔语义字符串 | 是否启用房间列表功能 |
+| `HISTORY_LIMIT` | `"100"` | 整数字符串 | 每个房间保留的历史消息条数 |
 | `TEXT_LIMIT` | `"40960"` | 整数字符串 | 单条文本消息最大长度 |
-| `FILE_LIMIT` | `"204857600"` | 整数字符串 | 单个文件上传大小上限，单位字节 |
-| `FILE_EXPIRE` | `"3600"` | 整数字符串 | 文件过期时间，单位秒 |
+| `FILE_LIMIT` | `"104857600"` | 整数字符串 | 单个文件上传大小上限，单位字节 |
+| `FILE_EXPIRE` | `"36000000"` | 整数字符串 | 文件过期时间，单位秒 |
 
-### roomAuth 说明
+### Worker Secrets
 
-`ROOM_AUTH` 需要是一个 JSON 字符串，对应后端的 `server.roomAuth`。
+以下值不得写入模板、Git 或 Pages 前端代码，必须在 Cloudflare Worker Secrets 中设置：
 
-示例：
+| Secret | 用途 |
+| --- | --- |
+| `APP_AUTH_PASSWORD` | 全局入口密码，仅用于兑换短期会话 Token |
+| `APP_ROOM_AUTH` | 房间密码 JSON，例如 `{"private":"room-password"}` |
+| `ROOM_SESSION_SECRET` | 会话 Token 的签名密钥；轮换后所有已登录会话失效 |
 
-```toml
-ROOM_AUTH = "{\"private\":\"\",\"finance\":\"finance-pass\",\"ops\":\"ops-pass\"}"
+设置示例：
+
+```bash
+cd cloudflare/workers
+wrangler secret put APP_AUTH_PASSWORD
+wrangler secret put APP_ROOM_AUTH
+wrangler secret put ROOM_SESSION_SECRET
 ```
 
-含义：
+当前实例的 Worker 仅通过 `clipboard-api.666050.xyz` 提供服务，`workers.dev` 已关闭；Pages 只会连接此 API 域名。
 
-- `private: ""` 表示 `private` 房间只接受全局 `AUTH_PASSWORD`
-- `finance: "finance-pass"` 表示 `finance` 房间同时接受全局 `AUTH_PASSWORD` 和 `finance-pass`
-- `ops: "ops-pass"` 表示 `ops` 房间同时接受全局 `AUTH_PASSWORD` 和 `ops-pass`
-
-如果你想修改这些变量，有两种方式：
-
-1. 在部署前直接编辑 [cloudflare/workers/wrangler.toml.template](cloudflare/workers/wrangler.toml.template)，然后重新执行 [cloudflare/deploy.sh](cloudflare/deploy.sh)
-2. 部署完成后，在 Cloudflare Dashboard 的 Workers 设置中修改变量
-
-注意：除了这些 `vars`，模板里还有几类不是“环境变量”的部署配置：
+除了这些变量，模板里还有几类运行所需绑定：
 
 - D1 绑定：`DB`
 - R2 绑定：`R2_BUCKET`
 - Durable Object 绑定：`WEBSOCKET_ROOM`
 
-这些绑定项同样是运行所必需的，但它们不属于 `vars`，通常由部署脚本自动处理，不需要像密码或限制值那样日常调整。
+这些绑定由部署脚本自动处理。
 
 ## 前端配置来源
 
@@ -203,9 +197,9 @@ SKIP_LOCAL_D1=1 bash deploy.sh
 - [cloudflare/workers/wrangler.toml.template](cloudflare/workers/wrangler.toml.template)
 - [cloudflare/pages/client/src/config.js.template](cloudflare/pages/client/src/config.js.template)
 
-### 4. 修改了密码或 `ROOM_AUTH` 后未生效
+### 4. 修改了密码或房间认证后未生效
 
-确认你修改的是模板文件 [cloudflare/workers/wrangler.toml.template](cloudflare/workers/wrangler.toml.template) 或 Cloudflare Dashboard 中的 Worker Variables，然后重新部署。
+确认你更新的是 Worker Secrets 中的 `APP_AUTH_PASSWORD` 或 `APP_ROOM_AUTH`，而不是模板文件；更新后重新登录即可。
 
 ### 5. Pages 能打开，但 API 或 WebSocket 连接异常
 
@@ -213,7 +207,7 @@ SKIP_LOCAL_D1=1 bash deploy.sh
 
 1. Worker 是否部署成功
 2. Pages 生成的 `config.js` 是否已写入正确的 Worker URL
-3. Worker 变量中的 `AUTH_PASSWORD` / `ROOM_AUTH` / `ROOM_LIST` 是否符合预期
+3. Worker Secrets 与 `ALLOWED_ORIGIN` / `ROOM_LIST` 是否符合预期
 4. D1 schema 是否已经迁移到远程数据库
 
 ## 相关文件

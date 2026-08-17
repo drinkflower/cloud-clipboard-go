@@ -1,5 +1,5 @@
 import { Router } from 'itty-router';
-import { corsHeaders, handleCors } from './cors';
+import { applyCorsHeaders, corsHeaders, forbiddenOriginResponse, handleCors, isAllowedOrigin, requiresAllowedOrigin } from './cors';
 import { canAccessRoom, canAccessRoomAsync, hasRoomAuthEntry, resolveRoomAuth, issueRoomSessionToken, validateRoomSessionToken, parseRoomSessionToken, extractAuthToken } from './auth';
 import { TextHandler } from './handlers/text';
 import { FileHandler } from './handlers/file';
@@ -49,8 +49,8 @@ router.get('/api/push', WebSocketHandler.connect);
 // 健康检查
 router.get('/health', () => new Response('OK'));
 
-// 房间会话令牌有效期，默认 1 小时
-const ROOM_SESSION_TTL = 3600;
+// 房间会话令牌有效期，默认 15 分钟
+const ROOM_SESSION_TTL = 15 * 60;
 
 // 处理 /auth/token 端点
 async function handleAuthToken(request, env) {
@@ -83,7 +83,7 @@ async function handleAuthToken(request, env) {
     }
 
     // 使用全局密码登录时，签发对所有房间有效的全局会话令牌
-    const globalPassword = String(env.AUTH_PASSWORD || '').trim();
+    const globalPassword = String(env.APP_AUTH_PASSWORD ?? env.AUTH_PASSWORD ?? '').trim();
     const scope = globalPassword && password === globalPassword ? 'global' : '';
 
     const token = await issueRoomSessionToken(env, room, ROOM_SESSION_TTL, scope);
@@ -152,8 +152,8 @@ async function handleServer(request, env) {
   const url = new URL(request.url);
   const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
   const requestedRoom = url.searchParams.has('room') ? url.searchParams.get('room') : null;
-  const globalPassword = String(env.AUTH_PASSWORD || '').trim();
-  const token = request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '') || url.searchParams.get('auth') || '';
+  const globalPassword = String(env.APP_AUTH_PASSWORD ?? env.AUTH_PASSWORD ?? '').trim();
+  const token = extractAuthToken(request);
 
   let authRequired = false;
   let authorized = true;
@@ -186,14 +186,21 @@ async function handleServer(request, env) {
 
 export default {
   async fetch(request, env, ctx) {
+    if (requiresAllowedOrigin(request) && !isAllowedOrigin(request, env)) {
+      return forbiddenOriginResponse();
+    }
+
+    let response;
     try {
-      return await router.handle(request, env, ctx);
+      response = await router.handle(request, env, ctx);
     } catch (error) {
       console.error('Worker error:', error);
-      return new Response('Internal Server Error', { 
+      response = new Response('Internal Server Error', {
         status: 500,
         headers: corsHeaders
       });
     }
+
+    return applyCorsHeaders(response, request, env);
   }
 };

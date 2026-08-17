@@ -40,12 +40,12 @@ export function extractAuthToken(request) {
     return authHeader;
   }
 
-  return new URL(request.url).searchParams.get('auth') || '';
+  return '';
 }
 
 // 提取 WebSocket 握手使用的 token。
-// 优先取 Authorization / ?auth= 以兼容旧客户端，其次取 Sec-WebSocket-Protocol 子协议，
-// 避免凭据出现在 URL 中泄漏到访问日志。
+// HTTP 使用 Authorization，浏览器 WebSocket 使用 Sec-WebSocket-Protocol，
+// 避免凭据出现在 URL 与访问日志中。
 export function extractWebSocketToken(request) {
   const token = extractAuthToken(request);
   if (token) {
@@ -103,7 +103,7 @@ export function normalizeAuthValue(value) {
 }
 
 export function parseRoomAuth(env) {
-  const roomAuth = env.ROOM_AUTH;
+  const roomAuth = env.APP_ROOM_AUTH ?? env.ROOM_AUTH;
   if (!roomAuth) {
     return {};
   }
@@ -133,7 +133,7 @@ export function parseRoomAuth(env) {
 
 export function resolveRoomAuth(env, room) {
   const normalizedRoom = normalizeRoomName(room);
-  const globalPassword = normalizeAuthValue(env.AUTH_PASSWORD);
+  const globalPassword = normalizeAuthValue(env.APP_AUTH_PASSWORD ?? env.AUTH_PASSWORD);
   const roomAuth = parseRoomAuth(env);
   const hasRoomPassword = Object.prototype.hasOwnProperty.call(roomAuth, normalizedRoom);
   const roomPassword = hasRoomPassword ? normalizeAuthValue(roomAuth[normalizedRoom]) : '';
@@ -159,7 +159,7 @@ export function tokenMatchesRoom(env, room, token) {
     return false;
   }
 
-  const globalPassword = normalizeAuthValue(env.AUTH_PASSWORD);
+  const globalPassword = normalizeAuthValue(env.APP_AUTH_PASSWORD ?? env.AUTH_PASSWORD);
   if (globalPassword && normalizedToken === globalPassword) {
     return true;
   }
@@ -193,8 +193,7 @@ export async function canAccessRoomAsync(env, room, token) {
     return true;
   }
 
-  // Fall back to password/bearer token
-  return tokenMatchesRoom(env, room, token);
+  return false;
 }
 
 export function hasRoomAuthEntry(env, room) {
@@ -236,10 +235,6 @@ export async function ensureRoomAccess(request, env, room, tokenOverride) {
     return { ok: true, room: normalizedRoom, token, requirement };
   }
 
-  if (tokenMatchesRoom(env, normalizedRoom, token)) {
-    return { ok: true, room: normalizedRoom, token, requirement };
-  }
-
   return {
     ok: false,
     room: normalizedRoom,
@@ -253,7 +248,7 @@ async function getRoomSessionSigningKey(env) {
   const material = [];
   material.push('cloud-clipboard-room-session-v1');
   
-  const globalPassword = normalizeAuthValue(env.AUTH_PASSWORD);
+  const globalPassword = normalizeAuthValue(env.APP_AUTH_PASSWORD ?? env.AUTH_PASSWORD);
   if (globalPassword) {
     material.push(globalPassword);
   }
@@ -291,7 +286,9 @@ export async function issueRoomSessionToken(env, room, ttlSeconds = 3600, scope 
   const claims = {
     typ: 'room_session',
     room: normalizedRoom,
+    iat: now,
     exp: now + validTtl,
+    aud: String(env.ALLOWED_ORIGIN || '').replace(/\/$/, ''),
   };
   // scope: ""=房间专属, "global"=全局所有房间
   if (scope === 'global') {
@@ -338,7 +335,13 @@ export async function parseRoomSessionToken(env, token) {
       return null;
     }
 
-    if (!claims.exp || claims.exp < Math.floor(Date.now() / 1000)) {
+    const now = Math.floor(Date.now() / 1000);
+    const expectedAudience = String(env.ALLOWED_ORIGIN || '').replace(/\/$/, '');
+    if (!Number.isInteger(claims.iat) || !Number.isInteger(claims.exp) || !claims.aud || claims.aud !== expectedAudience) {
+      return null;
+    }
+
+    if (claims.iat > now + 60 || claims.exp <= now || claims.exp - claims.iat > 15 * 60) {
       return null;
     }
 
