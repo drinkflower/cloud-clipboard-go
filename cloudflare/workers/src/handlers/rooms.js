@@ -87,9 +87,11 @@ export class RoomsHandler {
       const roomEntries = await Promise.all(Array.from(roomMap.values())
         .map(async row => {
           const normalizedRoom = row.room;
+          const isProtected = hasRoomAuthEntry(env, normalizedRoom);
           const hasGlobalAccess = await canAccessRoomAsync(env, normalizedRoom, '');
           const hasTokenAccess = await Promise.all(tokens.map(token => canAccessRoomAsync(env, normalizedRoom, token)));
-          if (!hasGlobalAccess && !hasTokenAccess.some(Boolean)) {
+          // 受保护房间可以展示在列表中，但实际进入时仍必须通过专属密码认证。
+          if (!isProtected && !hasGlobalAccess && !hasTokenAccess.some(Boolean)) {
             return null;
           }
           const messageLastActive = Number(row.messageLastActive || 0);
@@ -102,7 +104,7 @@ export class RoomsHandler {
             deviceCount,
             lastActive: Math.max(messageLastActive, presenceLastActive),
             isActive: deviceCount > 0,
-            isProtected: hasRoomAuthEntry(env, normalizedRoom),
+            isProtected,
           };
         }));
 
