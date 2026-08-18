@@ -20,7 +20,9 @@ export function isAllowedOrigin(request, env) {
 
 export function requiresAllowedOrigin(request) {
   const pathname = new URL(request.url).pathname;
-  return pathname.startsWith('/api/');
+  // 顶级下载、预览和外部分享链接通常不携带 Origin。它们仍由
+  // 会话/分享 Token 鉴权；只有带 Origin 的浏览器跨源请求才做来源限制。
+  return pathname.startsWith('/api/') && Boolean(request.headers.get('Origin'));
 }
 
 export function forbiddenOriginResponse() {
