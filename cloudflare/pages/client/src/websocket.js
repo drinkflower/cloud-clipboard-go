@@ -39,10 +39,10 @@ export default {
             date: new Date(),
             event: {
                 receive: data => {
-                    this.$root.received.unshift(data);
+                    this.upsertReceivedMessage(data);
                 },
                 receiveMulti: data => {
-                    this.$root.received.unshift(...Array.from(data).reverse());
+                    Array.from(data).reverse().forEach(item => this.upsertReceivedMessage(item));
                 },
                 revoke: data => {
                     let index = this.$root.received.findIndex(e => e.id === data.id);
@@ -88,6 +88,24 @@ export default {
         },
     },
     methods: {
+        upsertReceivedMessage(data) {
+            if (!data || data.id === undefined || data.id === null) {
+                return;
+            }
+
+            const messageId = String(data.id);
+            const existingIndex = this.$root.received.findIndex(item => String(item.id) === messageId);
+            if (existingIndex === -1) {
+                this.$root.received.unshift(data);
+                return;
+            }
+
+            // 历史同步和实时广播可能交叠；同一条消息以 ID 为准合并，不重复渲染。
+            this.$root.received.splice(existingIndex, 1, {
+                ...this.$root.received[existingIndex],
+                ...data,
+            });
+        },
         normalizeRoomName(room = '') {
             const normalized = (room || '').trim();
             return normalized === 'default' ? '' : normalized;
