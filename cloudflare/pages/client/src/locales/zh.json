@@ -57,6 +57,7 @@
     "alreadyAtBottom": "已经到底了哦～",
     "emptyHere": "这里空空的",
     "connectedDevices": "已连接的设备列表",
+    "currentDevice": "本机",
     "devicesConnected": "已有 {count} 个设备连接，桌面端设备 {desktop} 个，移动端设备 {mobile} 个。",
     "notConnectedToServer": "未连接到服务器。",
     "desktopDevice": "桌面端设备",

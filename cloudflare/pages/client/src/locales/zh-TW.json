@@ -57,6 +57,7 @@
     "alreadyAtBottom": "已經到底了喔～",
     "emptyHere": "這裡空空的",
     "connectedDevices": "已連線的裝置列表",
+    "currentDevice": "本機",
     "devicesConnected": "已有 {count} 個裝置連線，桌面端裝置 {desktop} 個，行動端裝置 {mobile} 個。",
     "notConnectedToServer": "未連線到伺服器。",
     "desktopDevice": "桌面端裝置",

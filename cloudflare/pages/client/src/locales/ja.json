@@ -57,6 +57,7 @@
     "alreadyAtBottom": "すでに一番下です～",
     "emptyHere": "ここには何もありません",
     "connectedDevices": "接続されているデバイスリスト",
+    "currentDevice": "この端末",
     "devicesConnected": "{count} 個のデバイスが接続されています。デスクトップデバイス {desktop} 個、モバイルデバイス {mobile} 個。",
     "notConnectedToServer": "サーバーに接続されていません。",
     "desktopDevice": "デスクトップデバイス",

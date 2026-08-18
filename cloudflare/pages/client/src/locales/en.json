@@ -57,6 +57,7 @@
     "alreadyAtBottom": "Already at the bottom~",
     "emptyHere": "It's empty here",
     "connectedDevices": "Connected Devices",
+    "currentDevice": "This device",
     "devicesConnected": "{count} devices connected, {desktop} desktop, {mobile} mobile.",
     "notConnectedToServer": "Not connected to server.",
     "desktopDevice": "Desktop Device",
