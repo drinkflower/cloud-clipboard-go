@@ -159,18 +159,19 @@ export function tokenMatchesRoom(env, room, token) {
     return false;
   }
 
-  const globalPassword = normalizeAuthValue(env.APP_AUTH_PASSWORD ?? env.AUTH_PASSWORD);
-  if (globalPassword && normalizedToken === globalPassword) {
-    return true;
-  }
-
   const normalizedRoom = normalizeRoomName(room);
   const roomAuth = parseRoomAuth(env);
   const roomPassword = Object.prototype.hasOwnProperty.call(roomAuth, normalizedRoom)
     ? normalizeAuthValue(roomAuth[normalizedRoom])
     : '';
 
-  return !!roomPassword && normalizedToken === roomPassword;
+  // 专属房间只接受自己的密码，不能被全局密码绕过。
+  if (roomPassword) {
+    return normalizedToken === roomPassword;
+  }
+
+  const globalPassword = normalizeAuthValue(env.APP_AUTH_PASSWORD ?? env.AUTH_PASSWORD);
+  return !!globalPassword && normalizedToken === globalPassword;
 }
 
 export function canAccessRoom(env, room, token) {
@@ -359,9 +360,9 @@ export async function validateRoomSessionToken(env, room, token) {
   }
 
   const normalizedRoom = normalizeRoomName(room);
-  // 全局会话令牌对所有房间有效
+  // 全局令牌不能绕过配置了专属密码的房间；这类房间必须使用自己的密码登录。
   if (claims.scope === 'global') {
-    return true;
+    return !hasRoomAuthEntry(env, normalizedRoom);
   }
 
   if (!claims.room || normalizeRoomName(claims.room) !== normalizedRoom) {
